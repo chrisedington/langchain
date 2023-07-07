@@ -153,6 +153,8 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
     def _load_sheet_from_id(self, id: str) -> List[Document]:
         """Load a sheet and all tabs from an ID."""
         time.sleep(DELAY_BETWEEN_REQUESTS)
+        print("SLEEEEPING")
+        print("SLEEEEPING")
         from googleapiclient.discovery import build
 
         creds = self._load_credentials()
@@ -194,6 +196,8 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
     def _load_document_from_id(self, id: str) -> Document:
         """Load a document from an ID."""
         time.sleep(DELAY_BETWEEN_REQUESTS)
+        print("SLEEEEPING")
+        print("SLEEEEPING")
         from io import BytesIO
 
         from googleapiclient.discovery import build
@@ -230,6 +234,8 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
     ) -> List[Document]:
         """Load documents from a folder."""
         time.sleep(DELAY_BETWEEN_REQUESTS)
+        print("SLEEEEPING")
+        print("SLEEEEPING")
         from googleapiclient.discovery import build
 
         creds = self._load_credentials()
@@ -263,6 +269,8 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
     ) -> List[Dict[str, Union[str, List[str]]]]:
         """Fetch all files and subfolders recursively."""
         time.sleep(DELAY_BETWEEN_REQUESTS)
+        print("SLEEEEPING")
+        print("SLEEEEPING")
         results = (
             service.files()
             .list(
@@ -339,6 +347,8 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
     def _load_file_from_ids(self) -> List[Document]:
         """Load files from a list of IDs."""
         time.sleep(DELAY_BETWEEN_REQUESTS)
+        print("SLEEEEPING")
+        print("SLEEEEPING")
         if not self.file_ids:
             raise ValueError("file_ids must be set")
         docs = []
