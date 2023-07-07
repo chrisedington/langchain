@@ -20,7 +20,7 @@ from langchain.docstore.document import Document
 from langchain.document_loaders.base import BaseLoader
 
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
-DELAY_BETWEEN_REQUESTS = 3 # Delay in seconds.
+DELAY_BETWEEN_REQUESTS = 1 # Delay in seconds.
 
 class GoogleDriveLoader(BaseLoader, BaseModel):
     """Loads Google Docs from Google Drive."""
