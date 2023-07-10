@@ -233,9 +233,9 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
         self, folder_id: str, *, file_types: Optional[Sequence[str]] = None
     ) -> List[Document]:
         """Load documents from a folder."""
-        time.sleep(DELAY_BETWEEN_REQUESTS)
-        print("SLEEEEPING")
-        print("SLEEEEPING")
+        # time.sleep(DELAY_BETWEEN_REQUESTS)
+        # print("SLEEEEPING")
+        # print("SLEEEEPING")
         from googleapiclient.discovery import build
 
         creds = self._load_credentials()
@@ -268,9 +268,9 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
         self, service: Any, folder_id: str
     ) -> List[Dict[str, Union[str, List[str]]]]:
         """Fetch all files and subfolders recursively."""
-        time.sleep(DELAY_BETWEEN_REQUESTS)
-        print("SLEEEEPING")
-        print("SLEEEEPING")
+        # time.sleep(DELAY_BETWEEN_REQUESTS)
+        # print("SLEEEEPING")
+        # print("SLEEEEPING")
         results = (
             service.files()
             .list(
