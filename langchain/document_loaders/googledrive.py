@@ -153,6 +153,7 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
     def _load_sheet_from_id(self, id: str) -> List[Document]:
         """Load a sheet and all tabs from an ID."""
         time.sleep(DELAY_BETWEEN_REQUESTS)
+        print(DELAY_BETWEEN_REQUESTS)
         print("SLEEEEPING")
         print("SLEEEEPING")
         from googleapiclient.discovery import build
@@ -196,6 +197,7 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
     def _load_document_from_id(self, id: str) -> Document:
         """Load a document from an ID."""
         time.sleep(DELAY_BETWEEN_REQUESTS)
+        print(DELAY_BETWEEN_REQUESTS)
         print("SLEEEEPING")
         print("SLEEEEPING")
         from io import BytesIO
@@ -357,6 +359,7 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
     def _load_file_from_ids(self) -> List[Document]:
         """Load files from a list of IDs."""
         time.sleep(DELAY_BETWEEN_REQUESTS)
+        print(DELAY_BETWEEN_REQUESTS)
         print("SLEEEEPING")
         documents = []
         for file_id in self.file_ids:
