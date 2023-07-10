@@ -298,7 +298,13 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
         if not self.document_ids:
             raise ValueError("document_ids must be set")
 
-        return [self._load_document_from_id(doc_id) for doc_id in self.document_ids]
+        documents = []
+        for doc_id in self.document_ids:
+            try:
+                documents.append(self._load_document_from_id(doc_id))
+            except Exception as e:
+                print(f"Error loading document {doc_id}: {str(e)}")
+        return documents
 
     def _load_file_from_id(self, id: str) -> List[Document]:
         """Load a file from an ID."""
@@ -320,11 +326,15 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
 
         if self.file_loader_cls is not None:
             fh.seek(0)
-            loader = self.file_loader_cls(file=fh, **self.file_loader_kwargs)
-            docs = loader.load()
-            for doc in docs:
-                doc.metadata["source"] = f"https://drive.google.com/file/d/{id}/view"
-            return docs
+            try:
+                loader = self.file_loader_cls(file=fh, **self.file_loader_kwargs)
+                docs = loader.load()
+                for doc in docs:
+                    doc.metadata["source"] = f"https://drive.google.com/file/d/{id}/view"
+                return docs
+            except Exception as e:
+                print(f"Error loading file {id} with custom loader: {str(e)}")
+                return []
 
         else:
             from PyPDF2 import PdfReader
@@ -348,13 +358,13 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
         """Load files from a list of IDs."""
         time.sleep(DELAY_BETWEEN_REQUESTS)
         print("SLEEEEPING")
-        print("SLEEEEPING")
-        if not self.file_ids:
-            raise ValueError("file_ids must be set")
-        docs = []
+        documents = []
         for file_id in self.file_ids:
-            docs.extend(self._load_file_from_id(file_id))
-        return docs
+            try:
+                documents.extend(self._load_file_from_id(file_id))
+            except Exception as e:
+                print(f"Error loading file {file_id}: {str(e)}")
+        return documents
 
     def load(self) -> List[Document]:
         """Load documents."""
