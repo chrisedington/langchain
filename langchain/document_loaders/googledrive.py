@@ -206,7 +206,7 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
             elif retries >= 3:
                 delay = 180
             else:
-                delay = 30  # No delay for the first attempt
+                delay = 0  # No delay for the first attempt
 
             time.sleep(delay)
             return self._load_sheet_from_id(id, retries - 1)
@@ -231,7 +231,7 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
             elif retries >= 3:
                 delay = 180
             else:
-                delay = 30  # No delay for the first attempt
+                delay = 0  # No delay for the first attempt
 
             time.sleep(delay)
 
@@ -285,7 +285,7 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
             elif retries >= 3:
                 delay = 180
             else:
-                delay = 30  # No delay for the first attempt
+                delay = 0  # No delay for the first attempt
 
             time.sleep(delay)
 
@@ -338,7 +338,7 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
             elif retries >= 3:
                 delay = 180
             else:
-                delay = 30  # No delay for the first attempt
+                delay = 0  # No delay for the first attempt
 
             time.sleep(delay)
 
@@ -386,7 +386,7 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
             elif retries >= 3:
                 delay = 180
             else:
-                delay = 30  # No delay for the first attempt
+                delay = 0  # No delay for the first attempt
 
             time.sleep(delay)
 
@@ -476,7 +476,7 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
                 elif retries >= 3:
                     delay = 180
                 else:
-                    delay = 30  # No delay for the first attempt
+                    delay = 0  # No delay for the first attempt
 
                 time.sleep(delay)
                 return self._load_file_from_id(id, retries - 1)
@@ -505,7 +505,7 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
                 elif retries >= 3:
                     delay = 180
                 else:
-                    delay = 30  # No delay for the first attempt
+                    delay = 0  # No delay for the first attempt
 
                 time.sleep(delay)
                 return self._load_file_from_ids(retries - 1)
@@ -537,7 +537,7 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
             elif retries >= 3:
                 delay = 180
             else:
-                delay = 30  # No delay for the first attempt
+                delay = 0  # No delay for the first attempt
 
             time.sleep(delay)
             return self.load(retries - 1)
