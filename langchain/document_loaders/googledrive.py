@@ -1,14 +1,3 @@
-"""Loader that loads data from Google Drive."""
-
-# Prerequisites:
-# 1. Create a Google Cloud project
-# 2. Enable the Google Drive API:
-#   https://console.cloud.google.com/flows/enableapi?apiid=drive.googleapis.com
-# 3. Authorize credentials for desktop app:
-#   https://developers.google.com/drive/api/quickstart/python#authorize_credentials_for_a_desktop_application # noqa: E501
-# 4. For service accounts visit
-#   https://cloud.google.com/iam/docs/service-accounts-create
-
 import os
 import time
 from pathlib import Path
@@ -20,35 +9,20 @@ from langchain.docstore.document import Document
 from langchain.document_loaders.base import BaseLoader
 
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
-DELAY_BETWEEN_REQUESTS = 30 # Delay in seconds.
 
 class GoogleDriveLoader(BaseLoader, BaseModel):
-    """Loads Google Docs from Google Drive."""
 
     service_account_key: Path = Path.home() / ".credentials" / "keys.json"
-    """Path to the service account key file."""
     credentials_path: Path = Path.home() / ".credentials" / "credentials.json"
-    """Path to the credentials file."""
     token_path: Path = Path.home() / ".credentials" / "token.json"
-    """Path to the token file."""
     folder_id: Optional[str] = None
-    """The folder id to load from."""
     document_ids: Optional[List[str]] = None
-    """The document ids to load from."""
     file_ids: Optional[List[str]] = None
-    """The file ids to load from."""
     recursive: bool = False
-    """Whether to load recursively. Only applies when folder_id is given."""
     file_types: Optional[Sequence[str]] = None
-    """The file types to load. Only applies when folder_id is given."""
     load_trashed_files: bool = False
-    """Whether to load trashed files. Only applies when folder_id is given."""
-    # NOTE(MthwRobinson) - changing the file_loader_cls to type here currently
-    # results in pydantic validation errors
     file_loader_cls: Any = None
-    """The file loader class to use."""
     file_loader_kwargs: Dict["str", Any] = {}
-    """The file loader kwargs to use."""
 
     @root_validator
     def validate_inputs(cls, values: Dict[str, Any]) -> Dict[str, Any]:
@@ -200,15 +174,15 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
             print(f"Error loading sheet {id}: {str(e)}")
             print(f"Retrying {self._load_sheet_from_id.__name__}... {retries} retries left")
             if retries == 1:
-                delay = 60
+                delay = 180
             elif retries == 2:
                 delay = 120
-            elif retries >= 3:
-                delay = 180
+            elif retries == 3:
+                delay = 60
+            elif retries == 4:
+                delay = 30
             else:
                 delay = 0  # No delay for the first attempt
-
-            time.sleep(delay)
             return self._load_sheet_from_id(id, retries - 1)
 
 
@@ -225,15 +199,15 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
             raise Exception("Maximum number of retries exceeded.")
         try:
             if retries == 1:
-                delay = 60
+                delay = 180
             elif retries == 2:
                 delay = 120
-            elif retries >= 3:
-                delay = 180
+            elif retries == 3:
+                delay = 60
+            elif retries == 4:
+                delay = 30
             else:
                 delay = 0  # No delay for the first attempt
-
-            time.sleep(delay)
 
             creds = self._load_credentials()
             service = build("drive", "v3", credentials=creds)
@@ -279,15 +253,15 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
             raise Exception("Maximum number of retries exceeded.")
         try:
             if retries == 1:
-                delay = 60
+                delay = 180
             elif retries == 2:
                 delay = 120
-            elif retries >= 3:
-                delay = 180
+            elif retries == 3:
+                delay = 60
+            elif retries == 4:
+                delay = 30
             else:
                 delay = 0  # No delay for the first attempt
-
-            time.sleep(delay)
 
             creds = self._load_credentials()
             service = build("drive", "v3", credentials=creds)
@@ -332,15 +306,15 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
             raise Exception("Maximum number of retries exceeded.")
         try:
             if retries == 1:
-                delay = 60
+                delay = 180
             elif retries == 2:
                 delay = 120
-            elif retries >= 3:
-                delay = 180
+            elif retries == 3:
+                delay = 60
+            elif retries == 4:
+                delay = 30
             else:
                 delay = 0  # No delay for the first attempt
-
-            time.sleep(delay)
 
             results = (
                 service.files()
@@ -380,15 +354,15 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
             raise Exception("Maximum number of retries exceeded.")
         try:
             if retries == 1:
-                delay = 60
+                delay = 180
             elif retries == 2:
                 delay = 120
-            elif retries >= 3:
-                delay = 180
+            elif retries == 3:
+                delay = 60
+            elif retries == 4:
+                delay = 30
             else:
                 delay = 0  # No delay for the first attempt
-
-            time.sleep(delay)
 
             documents = []
             for file_id in file_ids:
@@ -470,11 +444,13 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
                 print("An error occurred: {}".format(e))
                 print(f"Retrying {self._load_file_from_id.__name__}... {retries} retries left")
                 if retries == 1:
-                    delay = 60
+                    delay = 180
                 elif retries == 2:
                     delay = 120
-                elif retries >= 3:
-                    delay = 180
+                elif retries == 3:
+                    delay = 60
+                elif retries == 4:
+                    delay = 30
                 else:
                     delay = 0  # No delay for the first attempt
 
@@ -499,11 +475,13 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
                 print(f"Error loading file {file_id}: {str(e)}")
                 print(f"Retrying {self._load_file_from_ids.__name__}... {retries} retries left")
                 if retries == 1:
-                    delay = 60
+                    delay = 180
                 elif retries == 2:
                     delay = 120
-                elif retries >= 3:
-                    delay = 180
+                elif retries == 3:
+                    delay = 60
+                elif retries == 4:
+                    delay = 30
                 else:
                     delay = 0  # No delay for the first attempt
 
@@ -531,13 +509,13 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
             print(f"Error loading files: {str(e)}")
             print(f"Retrying load... {retries} retries left")
             if retries == 1:
-                delay = 60
+                delay = 180
             elif retries == 2:
                 delay = 120
-            elif retries >= 3:
-                delay = 180
+            elif retries == 3:
+                delay = 60
+            elif retries == 4:
+                delay = 30
             else:
                 delay = 0  # No delay for the first attempt
-
-            time.sleep(delay)
             return self.load(retries - 1)
