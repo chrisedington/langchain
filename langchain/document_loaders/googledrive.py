@@ -130,7 +130,18 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
             raise Exception("Maximum number of retries exceeded.")
 
         try:
+            if retries == 1:
+                delay = 180
+            elif retries == 2:
+                delay = 120
+            elif retries == 3:
+                delay = 60
+            elif retries == 4:
+                delay = 30
+            else:
+                delay = 0  # No delay for the first attempt
 
+            time.sleep(delay)
 
             from googleapiclient.discovery import build
 
@@ -173,16 +184,6 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
         except Exception as e:
             print(f"Error loading sheet {id}: {str(e)}")
             print(f"Retrying {self._load_sheet_from_id.__name__}... {retries} retries left")
-            if retries == 1:
-                delay = 180
-            elif retries == 2:
-                delay = 120
-            elif retries == 3:
-                delay = 60
-            elif retries == 4:
-                delay = 30
-            else:
-                delay = 0  # No delay for the first attempt
             return self._load_sheet_from_id(id, retries - 1)
 
 
@@ -208,7 +209,7 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
                 delay = 30
             else:
                 delay = 0  # No delay for the first attempt
-
+            time.sleep(delay)
             creds = self._load_credentials()
             service = build("drive", "v3", credentials=creds)
 
@@ -262,7 +263,7 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
                 delay = 30
             else:
                 delay = 0  # No delay for the first attempt
-
+            time.sleep(delay)
             creds = self._load_credentials()
             service = build("drive", "v3", credentials=creds)
             files = self._fetch_files_recursive(service, folder_id)
@@ -315,7 +316,7 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
                 delay = 30
             else:
                 delay = 0  # No delay for the first attempt
-
+            time.sleep(delay)
             results = (
                 service.files()
                 .list(
@@ -363,7 +364,7 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
                 delay = 30
             else:
                 delay = 0  # No delay for the first attempt
-
+            time.sleep(delay)
             documents = []
             for file_id in file_ids:
                 request = service.files().export_media(fileId=file_id, mimeType="text/plain")
@@ -396,6 +397,18 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
             raise Exception("Maximum number of retries exceeded.")
 
         try:
+            if retries == 1:
+                delay = 180
+            elif retries == 2:
+                delay = 120
+            elif retries == 3:
+                delay = 60
+            elif retries == 4:
+                delay = 30
+            else:
+                delay = 0  # No delay for the first attempt
+
+            time.sleep(delay)
             creds = self._load_credentials()
             service = build("drive", "v3", credentials=creds)
 
@@ -443,18 +456,6 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
             else:
                 print("An error occurred: {}".format(e))
                 print(f"Retrying {self._load_file_from_id.__name__}... {retries} retries left")
-                if retries == 1:
-                    delay = 180
-                elif retries == 2:
-                    delay = 120
-                elif retries == 3:
-                    delay = 60
-                elif retries == 4:
-                    delay = 30
-                else:
-                    delay = 0  # No delay for the first attempt
-
-                time.sleep(delay)
                 return self._load_file_from_id(id, retries - 1)
         except Exception as e:
             print("An error occurred: {}".format(e))
