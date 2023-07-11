@@ -20,7 +20,7 @@ from langchain.docstore.document import Document
 from langchain.document_loaders.base import BaseLoader
 
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
-DELAY_BETWEEN_REQUESTS = 1 # Delay in seconds.
+DELAY_BETWEEN_REQUESTS = 30 # Delay in seconds.
 
 class GoogleDriveLoader(BaseLoader, BaseModel):
     """Loads Google Docs from Google Drive."""
@@ -150,232 +150,394 @@ class GoogleDriveLoader(BaseLoader, BaseModel):
 
         return creds
 
-    def _load_sheet_from_id(self, id: str) -> List[Document]:
+    def _load_sheet_from_id(self, id: str, retries=5) -> List[Document]:
         """Load a sheet and all tabs from an ID."""
-        time.sleep(DELAY_BETWEEN_REQUESTS)
-        print(DELAY_BETWEEN_REQUESTS)
-        print("SLEEEEPING")
-        print("SLEEEEPING")
-        from googleapiclient.discovery import build
+        if retries < 0:
+            raise Exception("Maximum number of retries exceeded.")
 
-        creds = self._load_credentials()
-        sheets_service = build("sheets", "v4", credentials=creds)
-        spreadsheet = sheets_service.spreadsheets().get(spreadsheetId=id).execute()
-        sheets = spreadsheet.get("sheets", [])
+        try:
 
-        documents = []
-        for sheet in sheets:
-            sheet_name = sheet["properties"]["title"]
-            result = (
-                sheets_service.spreadsheets()
-                .values()
-                .get(spreadsheetId=id, range=sheet_name)
-                .execute()
-            )
-            values = result.get("values", [])
 
-            header = values[0]
-            for i, row in enumerate(values[1:], start=1):
-                metadata = {
-                    "source": (
-                        f"https://docs.google.com/spreadsheets/d/{id}/"
-                        f"edit?gid={sheet['properties']['sheetId']}"
-                    ),
-                    "title": f"{spreadsheet['properties']['title']} - {sheet_name}",
-                    "row": i,
-                }
-                content = []
-                for j, v in enumerate(row):
-                    title = header[j].strip() if len(header) > j else ""
-                    content.append(f"{title}: {v.strip()}")
+            from googleapiclient.discovery import build
 
-                page_content = "\n".join(content)
-                documents.append(Document(page_content=page_content, metadata=metadata))
+            creds = self._load_credentials()
+            sheets_service = build("sheets", "v4", credentials=creds)
+            spreadsheet = sheets_service.spreadsheets().get(spreadsheetId=id).execute()
+            sheets = spreadsheet.get("sheets", [])
 
-        return documents
+            documents = []
+            for sheet in sheets:
+                sheet_name = sheet["properties"]["title"]
+                result = (
+                    sheets_service.spreadsheets()
+                    .values()
+                    .get(spreadsheetId=id, range=sheet_name)
+                    .execute()
+                )
+                values = result.get("values", [])
 
-    def _load_document_from_id(self, id: str) -> Document:
+                header = values[0]
+                for i, row in enumerate(values[1:], start=1):
+                    metadata = {
+                        "source": (
+                            f"https://docs.google.com/spreadsheets/d/{id}/"
+                            f"edit?gid={sheet['properties']['sheetId']}"
+                        ),
+                        "title": f"{spreadsheet['properties']['title']} - {sheet_name}",
+                        "row": i,
+                    }
+                    content = []
+                    for j, v in enumerate(row):
+                        title = header[j].strip() if len(header) > j else ""
+                        content.append(f"{title}: {v.strip()}")
+
+                    page_content = "\n".join(content)
+                    documents.append(Document(page_content=page_content, metadata=metadata))
+
+            return documents
+
+        except Exception as e:
+            print(f"Error loading sheet {id}: {str(e)}")
+            print(f"Retrying {self._load_sheet_from_id.__name__}... {retries} retries left")
+            if retries == 1:
+                delay = 60
+            elif retries == 2:
+                delay = 120
+            elif retries >= 3:
+                delay = 180
+            else:
+                delay = 30  # No delay for the first attempt
+
+            time.sleep(delay)
+            return self._load_sheet_from_id(id, retries - 1)
+
+
+    def _load_document_from_id(self, id: str, retries=5) -> Document:
         """Load a document from an ID."""
-        time.sleep(DELAY_BETWEEN_REQUESTS)
-        print(DELAY_BETWEEN_REQUESTS)
-        print("SLEEEEPING")
-        print("SLEEEEPING")
+
         from io import BytesIO
 
         from googleapiclient.discovery import build
         from googleapiclient.errors import HttpError
         from googleapiclient.http import MediaIoBaseDownload
 
-        creds = self._load_credentials()
-        service = build("drive", "v3", credentials=creds)
-
-        file = service.files().get(fileId=id, supportsAllDrives=True).execute()
-        request = service.files().export_media(fileId=id, mimeType="text/plain")
-        fh = BytesIO()
-        downloader = MediaIoBaseDownload(fh, request)
-        done = False
+        if retries < 0:
+            raise Exception("Maximum number of retries exceeded.")
         try:
-            while done is False:
-                status, done = downloader.next_chunk()
+            if retries == 1:
+                delay = 60
+            elif retries == 2:
+                delay = 120
+            elif retries >= 3:
+                delay = 180
+            else:
+                delay = 30  # No delay for the first attempt
+
+            time.sleep(delay)
+
+            creds = self._load_credentials()
+            service = build("drive", "v3", credentials=creds)
+
+            file = service.files().get(fileId=id, supportsAllDrives=True).execute()
+            request = service.files().export_media(fileId=id, mimeType="text/plain")
+            fh = BytesIO()
+            downloader = MediaIoBaseDownload(fh, request)
+            done = False
+            try:
+                while done is False:
+                    status, done = downloader.next_chunk()
+
+            except HttpError as e:
+                if e.resp.status == 404:
+                    print("File not found: {}".format(id))
+                else:
+                    print("An error occurred: {}".format(e))
+
+            text = fh.getvalue().decode("utf-8")
+            metadata = {
+                "source": f"https://docs.google.com/document/d/{id}/edit",
+                "title": f"{file.get('name')}",
+            }
+            return Document(page_content=text, metadata=metadata)
 
         except HttpError as e:
-            if e.resp.status == 404:
-                print("File not found: {}".format(id))
-            else:
-                print("An error occurred: {}".format(e))
-
-        text = fh.getvalue().decode("utf-8")
-        metadata = {
-            "source": f"https://docs.google.com/document/d/{id}/edit",
-            "title": f"{file.get('name')}",
-        }
-        return Document(page_content=text, metadata=metadata)
+                if e.resp.status == 404:
+                    print("File not found: {}".format(id))
+                else:
+                    print("An error occurred: {}".format(e))
+                    print(f"Retrying {self._load_document_from_id.__name__}... {retries} retries left")
+                    return self._load_document_from_id(id, retries - 1)
 
     def _load_documents_from_folder(
-        self, folder_id: str, *, file_types: Optional[Sequence[str]] = None
+        self, folder_id: str, *, file_types: Optional[Sequence[str]] = None, retries=5
     ) -> List[Document]:
         """Load documents from a folder."""
-        # time.sleep(DELAY_BETWEEN_REQUESTS)
-        # print("SLEEEEPING")
-        # print("SLEEEEPING")
+
         from googleapiclient.discovery import build
 
-        creds = self._load_credentials()
-        service = build("drive", "v3", credentials=creds)
-        files = self._fetch_files_recursive(service, folder_id)
-        # If file types filter is provided, we'll filter by the file type.
-        if file_types:
-            _files = [f for f in files if f["mimeType"] in file_types]  # type: ignore
-        else:
-            _files = files
-
-        returns = []
-        for file in _files:
-            if file["trashed"] and not self.load_trashed_files:
-                continue
-            elif file["mimeType"] == "application/vnd.google-apps.document":
-                returns.append(self._load_document_from_id(file["id"]))  # type: ignore
-            elif file["mimeType"] == "application/vnd.google-apps.spreadsheet":
-                returns.extend(self._load_sheet_from_id(file["id"]))  # type: ignore
-            elif (
-                file["mimeType"] == "application/pdf"
-                or self.file_loader_cls is not None
-            ):
-                returns.extend(self._load_file_from_id(file["id"]))  # type: ignore
+        if retries < 0:
+            raise Exception("Maximum number of retries exceeded.")
+        try:
+            if retries == 1:
+                delay = 60
+            elif retries == 2:
+                delay = 120
+            elif retries >= 3:
+                delay = 180
             else:
-                pass
-        return returns
+                delay = 30  # No delay for the first attempt
+
+            time.sleep(delay)
+
+            creds = self._load_credentials()
+            service = build("drive", "v3", credentials=creds)
+            files = self._fetch_files_recursive(service, folder_id)
+            # If file types filter is provided, we'll filter by the file type.
+            if file_types:
+                _files = [f for f in files if f["mimeType"] in file_types]  # type: ignore
+            else:
+                _files = files
+
+            returns = []
+            for file in _files:
+                if file["trashed"] and not self.load_trashed_files:
+                    continue
+                elif file["mimeType"] == "application/vnd.google-apps.document":
+                    returns.append(self._load_document_from_id(file["id"], retries))  # type: ignore
+                elif file["mimeType"] == "application/vnd.google-apps.spreadsheet":
+                    returns.extend(self._load_sheet_from_id(file["id"]))  # type: ignore
+                elif (
+                    file["mimeType"] == "application/pdf"
+                    or self.file_loader_cls is not None
+                ):
+                    returns.extend(self._load_file_from_id(file["id"]))  # type: ignore
+                else:
+                    pass
+            return returns
+
+        except Exception as e:
+            print(f"Error occurred: {str(e)}")
+            print(f"Retrying {self._load_documents_from_folder.__name__}... {retries} retries left")
+            return self._load_documents_from_folder(folder_id, file_types=file_types, retries=retries - 1)
+
 
     def _fetch_files_recursive(
-        self, service: Any, folder_id: str
-    ) -> List[Dict[str, Union[str, List[str]]]]:
+        self, service: Any, folder_id: str, retries=5
+        ) -> List[Dict[str, Union[str, List[str]]]]:
         """Fetch all files and subfolders recursively."""
-        # time.sleep(DELAY_BETWEEN_REQUESTS)
-        # print("SLEEEEPING")
-        # print("SLEEEEPING")
-        results = (
-            service.files()
-            .list(
-                q=f"'{folder_id}' in parents",
-                pageSize=1000,
-                includeItemsFromAllDrives=True,
-                supportsAllDrives=True,
-                fields="nextPageToken, files(id, name, mimeType, parents, trashed)",
-            )
-            .execute()
-        )
-        files = results.get("files", [])
-        returns = []
-        for file in files:
-            if file["mimeType"] == "application/vnd.google-apps.folder":
-                if self.recursive:
-                    returns.extend(self._fetch_files_recursive(service, file["id"]))
+
+        from googleapiclient.errors import HttpError
+
+        if retries < 0:
+            raise Exception("Maximum number of retries exceeded.")
+        try:
+            if retries == 1:
+                delay = 60
+            elif retries == 2:
+                delay = 120
+            elif retries >= 3:
+                delay = 180
             else:
-                returns.append(file)
+                delay = 30  # No delay for the first attempt
 
-        return returns
+            time.sleep(delay)
 
-    def _load_documents_from_ids(self) -> List[Document]:
-        """Load documents from a list of IDs."""
-        if not self.document_ids:
-            raise ValueError("document_ids must be set")
+            results = (
+                service.files()
+                .list(
+                    q=f"'{folder_id}' in parents",
+                    pageSize=1000,
+                    includeItemsFromAllDrives=True,
+                    supportsAllDrives=True,
+                    fields="nextPageToken, files(id, name, mimeType, parents, trashed)",
+                )
+                .execute()
+            )
+            files = results.get("files", [])
+            returns = []
+            for file in files:
+                if file["mimeType"] == "application/vnd.google-apps.folder":
+                    if self.recursive:
+                        returns.extend(self._fetch_files_recursive(service, file["id"]))
+                else:
+                    returns.append(file)
 
-        documents = []
-        for doc_id in self.document_ids:
-            try:
-                documents.append(self._load_document_from_id(doc_id))
-            except Exception as e:
-                print(f"Error loading document {doc_id}: {str(e)}")
-        return documents
+            return returns
+        except HttpError as e:
+            print("An error occurred: {}".format(e))
+            print(f"Retrying {self._fetch_files_recursive.__name__}... {retries} retries left")
+            return self._fetch_files_recursive(service, folder_id, retries - 1)
 
-    def _load_file_from_id(self, id: str) -> List[Document]:
+
+    def _load_documents_from_ids(
+        self, service: Any, file_ids: List[str], retries=5
+    ) -> List[str]:
+        """Loads documents from a list of file ids."""
+
+        from googleapiclient.errors import HttpError
+
+        if retries < 0:
+            raise Exception("Maximum number of retries exceeded.")
+        try:
+            if retries == 1:
+                delay = 60
+            elif retries == 2:
+                delay = 120
+            elif retries >= 3:
+                delay = 180
+            else:
+                delay = 30  # No delay for the first attempt
+
+            time.sleep(delay)
+
+            documents = []
+            for file_id in file_ids:
+                request = service.files().export_media(fileId=file_id, mimeType="text/plain")
+                try:
+                    response = request.execute_http_request(request.http_request)
+                except HttpError as error:
+                    print(f"An error occurred: {error}")
+                    continue
+                if response.status_code == 200:
+                    document = response.content.decode()
+                    documents.append(document)
+                else:
+                    print(f"An error occurred: {response}")
+                    continue
+            return documents
+        except HttpError as e:
+            print("An error occurred: {}".format(e))
+            print(f"Retrying {self._load_documents_from_ids.__name__}... {retries} retries left")
+            return self._load_documents_from_ids(service, file_ids, retries - 1)
+
+
+    def _load_file_from_id(self, id: str, retries=5) -> List[Document]:
         """Load a file from an ID."""
         from io import BytesIO
-
+        from googleapiclient.errors import HttpError
         from googleapiclient.discovery import build
         from googleapiclient.http import MediaIoBaseDownload
 
-        creds = self._load_credentials()
-        service = build("drive", "v3", credentials=creds)
+        if retries < 0:
+            raise Exception("Maximum number of retries exceeded.")
 
-        file = service.files().get(fileId=id, supportsAllDrives=True).execute()
-        request = service.files().get_media(fileId=id)
-        fh = BytesIO()
-        downloader = MediaIoBaseDownload(fh, request)
-        done = False
-        while done is False:
-            status, done = downloader.next_chunk()
+        try:
+            creds = self._load_credentials()
+            service = build("drive", "v3", credentials=creds)
 
-        if self.file_loader_cls is not None:
-            fh.seek(0)
-            try:
-                loader = self.file_loader_cls(file=fh, **self.file_loader_kwargs)
-                docs = loader.load()
-                for doc in docs:
-                    doc.metadata["source"] = f"https://drive.google.com/file/d/{id}/view"
-                return docs
-            except Exception as e:
-                print(f"Error loading file {id} with custom loader: {str(e)}")
+            file = service.files().get(fileId=id, supportsAllDrives=True).execute()
+            request = service.files().get_media(fileId=id)
+            fh = BytesIO()
+            downloader = MediaIoBaseDownload(fh, request)
+            done = False
+            while done is False:
+                status, done = downloader.next_chunk()
+
+            if self.file_loader_cls is not None:
+                fh.seek(0)
+                try:
+                    loader = self.file_loader_cls(file=fh, **self.file_loader_kwargs)
+                    docs = loader.load()
+                    for doc in docs:
+                        doc.metadata["source"] = f"https://drive.google.com/file/d/{id}/view"
+                    return docs
+                except Exception as e:
+                    print(f"Error loading file {id} with custom loader: {str(e)}")
+                    return []
+
+            else:
+                from PyPDF2 import PdfReader
+
+                content = fh.getvalue()
+                pdf_reader = PdfReader(BytesIO(content))
+
+                return [
+                    Document(
+                        page_content=page.extract_text(),
+                        metadata={
+                            "source": f"https://drive.google.com/file/d/{id}/view",
+                            "title": f"{file.get('name')}",
+                            "page": i,
+                        },
+                    )
+                    for i, page in enumerate(pdf_reader.pages)
+                ]
+
+        except HttpError as e:
+            if e.resp.status in [404]:
                 return []
+            else:
+                print("An error occurred: {}".format(e))
+                print(f"Retrying {self._load_file_from_id.__name__}... {retries} retries left")
+                if retries == 1:
+                    delay = 60
+                elif retries == 2:
+                    delay = 120
+                elif retries >= 3:
+                    delay = 180
+                else:
+                    delay = 30  # No delay for the first attempt
 
-        else:
-            from PyPDF2 import PdfReader
+                time.sleep(delay)
+                return self._load_file_from_id(id, retries - 1)
+        except Exception as e:
+            print("An error occurred: {}".format(e))
+            return []
 
-            content = fh.getvalue()
-            pdf_reader = PdfReader(BytesIO(content))
 
-            return [
-                Document(
-                    page_content=page.extract_text(),
-                    metadata={
-                        "source": f"https://drive.google.com/file/d/{id}/view",
-                        "title": f"{file.get('name')}",
-                        "page": i,
-                    },
-                )
-                for i, page in enumerate(pdf_reader.pages)
-            ]
-
-    def _load_file_from_ids(self) -> List[Document]:
+    def _load_file_from_ids(self, retries=5) -> List[Document]:
         """Load files from a list of IDs."""
-        time.sleep(DELAY_BETWEEN_REQUESTS)
-        print(DELAY_BETWEEN_REQUESTS)
-        print("SLEEEEPING")
+        if retries < 0:
+            raise Exception("Maximum number of retries exceeded.")
+
         documents = []
         for file_id in self.file_ids:
             try:
+
                 documents.extend(self._load_file_from_id(file_id))
             except Exception as e:
                 print(f"Error loading file {file_id}: {str(e)}")
+                print(f"Retrying {self._load_file_from_ids.__name__}... {retries} retries left")
+                if retries == 1:
+                    delay = 60
+                elif retries == 2:
+                    delay = 120
+                elif retries >= 3:
+                    delay = 180
+                else:
+                    delay = 30  # No delay for the first attempt
+
+                time.sleep(delay)
+                return self._load_file_from_ids(retries - 1)
+
         return documents
 
-    def load(self) -> List[Document]:
+
+    def load(self, retries=5) -> List[Document]:
         """Load documents."""
-        if self.folder_id:
-            return self._load_documents_from_folder(
-                self.folder_id, file_types=self.file_types
-            )
-        elif self.document_ids:
-            return self._load_documents_from_ids()
-        else:
-            return self._load_file_from_ids()
+        if retries < 0:
+            raise Exception("Maximum number of retries exceeded.")
+
+        try:
+            if self.folder_id:
+                return self._load_documents_from_folder(
+                    self.folder_id, file_types=self.file_types
+                )
+            elif self.document_ids:
+                return self._load_documents_from_ids()
+            else:
+                return self._load_file_from_ids()
+        except Exception as e:
+            print(f"Error loading files: {str(e)}")
+            print(f"Retrying load... {retries} retries left")
+            if retries == 1:
+                delay = 60
+            elif retries == 2:
+                delay = 120
+            elif retries >= 3:
+                delay = 180
+            else:
+                delay = 30  # No delay for the first attempt
+
+            time.sleep(delay)
+            return self.load(retries - 1)
